@@ -1,9 +1,9 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone
-from flask_bcrypt import Bcrypt
+from app.db import db
 
 db = SQLAlchemy()
-bcrypt = Bcrypt()
+
 
 def utc_now():
     return datetime.now(timezone.utc)
