@@ -15,7 +15,11 @@ class User(db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.Enum('patient', 'doctor', 'hospital_admin', 'pharmacy', 'super_admin', name='user_roles'), nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    status = db.Column(db.Enum('pending', 'active', 'disabled', name='user_status'), default='active')
+    invite_token = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
     # Relationships
     patient = db.relationship("Patient", uselist=False, back_populates="user")
     doctor = db.relationship("Doctor", uselist=False, back_populates="user")

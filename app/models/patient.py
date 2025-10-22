@@ -9,7 +9,13 @@ class Patient(db.Model):
     date_of_birth = db.Column(db.Date)
     gender = db.Column(db.String(10))
     phone = db.Column(db.String(20))
-    medical_history = db.Column(db.Text)
+    address = db.Column(db.String(255))
+    profile_pic = db.Column(db.Text)  # base64 or image URL
+
+    next_of_kin_name = db.Column(db.String(150))
+    next_of_kin_id = db.Column(db.String(50))
+    next_of_kin_phone = db.Column(db.String(20))
+
 
     user = db.relationship("User", back_populates="patient")
     medical_records = db.relationship("MedicalRecord", back_populates="patient")
