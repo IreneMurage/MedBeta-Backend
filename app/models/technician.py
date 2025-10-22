@@ -1,6 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app.db import db
 
+def utc_now():
+    return datetime.now(timezone.utc)
 
 class Technician(db.Model):
     __tablename__ = "technicians"
@@ -10,7 +12,7 @@ class Technician(db.Model):
     profile_pic = db.Column(db.String(255))
     notes = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True)
-    last_login = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime, default=utc_now)
 
     # Relationships
     user = db.relationship("User", back_populates="technician")
@@ -27,7 +29,7 @@ class TestRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     test_name = db.Column(db.String(150), nullable=False)
     status = db.Column(db.String(20), default="Pending") 
-    date_requested = db.Column(db.DateTime, default=datetime.utcnow)
+    date_requested = db.Column(db.DateTime, default=utc_now)
     date_completed = db.Column(db.DateTime, nullable=True)
 
     # Foreign keys

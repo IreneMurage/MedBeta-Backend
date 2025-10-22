@@ -1,7 +1,7 @@
 from app.db import db
 
 class Hospital(db.Model):
-    tablename = "hospitals"
+    __tablename__ = "hospitals"
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
