@@ -1,0 +1,26 @@
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, timezone
+from flask_bcrypt import Bcrypt
+
+db = SQLAlchemy()
+bcrypt = Bcrypt()
+
+def utc_now():
+    return datetime.now(timezone.utc)
+
+# Appointment Model
+id = db.Column(db.Integer, primary_key=True)
+patient_id = db.Column(db.Integer, db.ForeignKey("patients.id"), nullable=False)
+doctor_id = db.Column(db.Integer, db.ForeignKey("doctors.id"), nullable=False)
+hospital_id = db.Column(db.Integer, db.ForeignKey("hospitals.id"), nullable=False)
+date = db.Column(db.Date, nullable=False)
+time = db.Column(db.Time, nullable=False)
+status = db.Column(db.Enum("pending", "accepted", "declined", "completed", name="appointment_status"), default="pending")
+created_at = db.Column(db.DateTime, default=utc_now)
+
+patient = db.relationship("Patient", back_populates="appointments")
+doctor = db.relationship("Doctor", back_populates="appointments")
+hospital = db.relationship("Hospital", back_populates="appointments")
+
+def __repr__(self):
+    return f"<Appointment {self.date} - {self.status}>"

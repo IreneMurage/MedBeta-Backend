@@ -1,0 +1,22 @@
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, timezone
+from flask_bcrypt import Bcrypt
+
+db = SQLAlchemy()
+bcrypt = Bcrypt()
+
+def utc_now():
+    return datetime.now(timezone.utc)
+
+id = db.Column(db.Integer, primary_key=True)
+user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+name = db.Column(db.String(150), nullable=False)
+location = db.Column(db.String(255))
+license_number = db.Column(db.String(100), unique=True)
+is_verified = db.Column(db.Boolean, default=False)
+
+user = db.relationship("User", back_populates="pharmacy")
+prescriptions = db.relationship("Prescription", back_populates="pharmacy")
+
+def __repr__(self):
+    return f"<Pharmacy {self.name}>"
