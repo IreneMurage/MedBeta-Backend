@@ -9,6 +9,7 @@ flask-sqlalchemy = "*"
 flask-migrate = "*"
 psycopg = {extras = ["binary", "pool"], version = "*"}
 python-dotenv = "*"
+flask-bcrypt = "*"
 
 [dev-packages]
 
