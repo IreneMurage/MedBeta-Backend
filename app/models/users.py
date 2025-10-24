@@ -26,7 +26,7 @@ class User(db.Model):
     doctor = db.relationship("Doctor", uselist=False, back_populates="user")
     hospital = db.relationship("Hospital", uselist=False, back_populates="user")
     pharmacy = db.relationship("Pharmacy", uselist=False, back_populates="user")
-
+    technician = db.relationship("Technician", back_populates="user", uselist=False)
     notifications = db.relationship("Notification", back_populates="user", cascade="all, delete-orphan")
 
     def set_password(self, password):
