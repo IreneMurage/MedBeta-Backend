@@ -19,7 +19,6 @@ class Patient(db.Model):
 
     user = db.relationship("User", back_populates="patient")
     medical_records = db.relationship("MedicalRecord", back_populates="patient")
-    # add to doctor model - medical_records = db.relationship("MedicalRecord", back_populates="doctor")
     appointments = db.relationship("Appointment", back_populates="patient")
     prescriptions = db.relationship("Prescription", back_populates="patient")
     reviews = db.relationship("Review", back_populates="patient")

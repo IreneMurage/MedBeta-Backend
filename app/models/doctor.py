@@ -14,6 +14,7 @@ class Doctor(db.Model):
     user = db.relationship("User", back_populates="doctor")
     hospital = db.relationship("Hospital", back_populates="doctors")
     appointments = db.relationship("Appointment", back_populates="doctor")
+    medical_records = db.relationship("MedicalRecord", back_populates="doctor")
     prescriptions = db.relationship("Prescription", back_populates="doctor")
     reviews = db.relationship("Review", back_populates="doctor")
     access_logs = db.relationship("AccessLog", back_populates="doctor")

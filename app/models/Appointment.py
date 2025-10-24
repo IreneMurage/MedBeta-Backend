@@ -19,6 +19,8 @@ class Appointment(db.Model):
     patient = db.relationship("Patient", back_populates="appointments")
     doctor = db.relationship("Doctor", back_populates="appointments")
     hospital = db.relationship("Hospital", back_populates="appointments")
+    medical_record = db.relationship("MedicalRecord", back_populates="appointment", uselist=False)
+
 
     def __repr__(self):
         return f"<Appointment {self.date} - {self.status}>"
