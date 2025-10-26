@@ -4,6 +4,7 @@ from .db import db,migrate
 from .models import *
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
+from datetime import timedelta
 from app.routes import auth_bp, appointment_bp, medical_bp, superadmin_bp
 
 bcrypt = Bcrypt()
@@ -21,6 +22,7 @@ def add_claims_to_access_token(identity):
 def create_app():
     app=Flask(__name__)
     app.config.from_object(Config)
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 
     # initialize db
     db.init_app(app)

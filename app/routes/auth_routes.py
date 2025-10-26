@@ -3,9 +3,9 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from datetime import timedelta
 from app.db import db
 from app.models import User, PendingUser, Patient, Doctor, Hospital, Pharmacy, Technician
-# from app.utils.email_utils import send_invite_email, send_reset_email
-# from app.utils.tokens import generate_token, verify_token
-# from app.utils.time import utc_now
+from app.utils.email_utils import send_invite_email, send_reset_email
+from app.utils.tokens import generate_token, verify_token
+from app.utils.time import utc_now
 
 auth_bp = Blueprint("auth_bp", __name__)
 
@@ -102,46 +102,68 @@ def change_password():
 #  GET /auth/setup-password/<token>  -> Invite activation
 @auth_bp.route("/setup-password/<token>", methods=["GET", "POST"])
 def setup_password(token):
-    pending = PendingUser.query.filter_by(invite_token=token).first()
+    pending = PendingUser.query.filter_by(invite_token=token, is_accepted=False).first()
 
     if not pending:
-        return jsonify({"error": "Invalid or expired invite"}), 400
+        return jsonify({"error": "Invalid or expired invite link"}), 400
 
     if request.method == "GET":
-        return jsonify({"email": pending.email, "role": pending.role}), 200
+        return jsonify({
+            "email": pending.email,
+            "role": pending.role,
+            "name": pending.name
+        }), 200
 
-    # POST -> finalize invite
     data = request.get_json()
     password = data.get("password")
 
+    if not password:
+        return jsonify({"error": "Password is required"}), 400
+
+    # Check if already activated
+    if User.query.filter_by(email=pending.email).first():
+        return jsonify({"error": "User already activated"}), 400
+
+    # Create the user with bcrypt hashing
     user = User(
         name=pending.name,
         email=pending.email,
         role=pending.role,
         invite_token=pending.invite_token,
+        is_active=True
     )
     user.set_password(password)
     db.session.add(user)
     db.session.flush()
 
-    # Create the appropriate linked profile
-    if pending.role == "doctor":
-        doctor = Doctor(user_id=user.id, hospital_id=pending.hospital_id)
-        db.session.add(doctor)
-    elif pending.role == "pharmacy":
-        pharmacy = Pharmacy(user_id=user.id)
-        db.session.add(pharmacy)
-    elif pending.role == "labtech" or pending.role == "technician":
-        technician = Technician(user_id=user.id)
-        db.session.add(technician)
-    elif pending.role == "hospital":
-        hospital = Hospital(user_id=user.id)
-        db.session.add(hospital)
+    #  Linked profiles based on role
+    role = pending.role.lower()
+    if role == "doctor":
+        db.session.add(Doctor(user_id=user.id, hospital_id=pending.hospital_id))
+    elif role == "pharmacy":
+        db.session.add(Pharmacy(user_id=user.id))
+    elif role in ("labtech", "technician"):
+        db.session.add(Technician(user_id=user.id))
+    elif role == "hospital":
+        db.session.add(Hospital(user_id=user.id))
 
     pending.is_accepted = True
     db.session.commit()
 
     token = create_access_token(
-        identity={"id": user.id, "role": user.role}, expires_delta=timedelta(days=1)
+        identity=user.id,
+        additional_claims={"role": user.role},
+        expires_delta=timedelta(hours=2)
     )
-    return jsonify({"message": "Account setup complete", "token": token}), 201
+
+    return jsonify({
+        "message": f"Welcome {user.name}! Your {user.role} account is now active.",
+        "access_token": token,
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role
+        }
+    }), 201
+

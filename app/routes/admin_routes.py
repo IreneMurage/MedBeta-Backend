@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from app.db import db
 from app.models import PendingUser, User, Hospital, AccessLog
 from app.utils.role_required import role_required
-# from app.utils.email_utils import send_invite_email  # optional for now
+from app.utils.email_utils import send_invite_email
 
 superadmin_bp = Blueprint("superadmin_bp", __name__, url_prefix="/admin")
 
@@ -20,30 +20,52 @@ def invite_user():
     role = data.get("role")
     hospital_id = data.get("hospital_id")  # optional
 
+    # Validate input
     if not email or not role or not name:
-        return jsonify({"error": "Missing required fields"}), 400
+        return jsonify({"error": "Missing required fields (email, name, role)"}), 400
 
+    # Prevent duplicates
     if PendingUser.query.filter_by(email=email).first() or User.query.filter_by(email=email).first():
-        return jsonify({"error": "Email already exists"}), 400
+        return jsonify({"error": "A user with this email already exists"}), 400
 
+    # Create a unique token
     token = str(uuid4())
     expires_at = datetime.utcnow() + timedelta(days=7)
 
+    # Store pending invite
     pending = PendingUser(
         email=email,
         name=name,
         role=role,
         hospital_id=hospital_id,
         invite_token=token,
-        expires_at=expires_at
+        expires_at=expires_at,
+        is_accepted=False,
     )
     db.session.add(pending)
     db.session.commit()
 
-    # Optional: send email
-    # send_invite_email(email, token)
+    # Send invitation email
+    try:
+        sent = send_invite_email(email, token)
+        if not sent:
+            return jsonify({
+                "warning": "Invite created but email not sent (check SendGrid config)",
+                "invite_token": token
+            }), 201
+    except Exception as e:
+        print(f"Email error: {e}")
+        return jsonify({
+            "warning": "Invite created, but failed to send email",
+            "invite_token": token
+        }), 201
 
-    return jsonify({"message": "Invite created", "invite_token": token}), 201
+    # Return success response
+    return jsonify({
+        "message": f"Invite sent to {email} successfully",
+        "invite_token": token,
+        "expires_at": expires_at.isoformat()
+    }), 201
 
 
 #  GET /admin/pending-invites
