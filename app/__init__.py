@@ -50,6 +50,7 @@ def create_superadmin_if_needed():
         print(f"SuperAdmin already exists: {email}")
 
 
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -57,6 +58,15 @@ def create_app():
 
     # Initialize db and migrations
     db.init_app(app)
+    migrate.init_app(app,db)
+    bcrypt.init_app(app)
+    CORS(app, supports_credentials=True)
+    jwt.init_app(app)
+
+
+
+    
+    return app
     migrate.init_app(app, db)
 
     # Initialize bcrypt

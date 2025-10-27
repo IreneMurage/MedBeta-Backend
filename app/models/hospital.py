@@ -9,6 +9,7 @@ class Hospital(db.Model):
     location = db.Column(db.String(255))
     license_number = db.Column(db.String(100), unique=True)
     is_verified = db.Column(db.Boolean, default=False)
+    agreement_signed = db.Column(db.Boolean, default=False)
 
     user = db.relationship("User", back_populates="hospital")
     doctors = db.relationship("Doctor", back_populates="hospital")
