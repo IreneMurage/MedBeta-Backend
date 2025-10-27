@@ -74,7 +74,7 @@ def send_invite_email(to_email, token):
     setup_link = f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/setup-password/{token}"
     subject = "You're invited to join MedBeta!"
     html_content = f"""
-        <h2>Welcome to MediConnect </h2>
+        <h2>Welcome to MedBeta </h2>
         <p>You’ve been invited to join our platform. Please click below to set your password and activate your account:</p>
         <p><a href="{setup_link}" target="_blank" style="color:#1a73e8;">Set up your account</a></p>
         <p>This link will expire in 7 days.</p>

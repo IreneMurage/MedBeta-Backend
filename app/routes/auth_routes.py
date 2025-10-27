@@ -1,11 +1,15 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import (
+    create_access_token,
+    jwt_required,
+    get_jwt_identity,
+    get_jwt
+)
 from datetime import timedelta
 from app.db import db
 from app.models import User, PendingUser, Patient, Doctor, Hospital, Pharmacy, Technician
 from app.utils.email_utils import send_invite_email, send_reset_email
 from app.utils.tokens import generate_token, verify_token
-from app.utils.time import utc_now
 
 auth_bp = Blueprint("auth_bp", __name__)
 
@@ -17,27 +21,33 @@ def register():
     email = data.get("email")
     password = data.get("password")
 
-    if not name or not email or not password:
+    if not all([name, email, password]):
         return jsonify({"error": "Missing required fields"}), 400
 
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "Email already exists"}), 400
 
-    # Create user
     user = User(name=name, email=email, role="patient")
     user.set_password(password)
     db.session.add(user)
     db.session.flush()
 
-    # Create linked patient profile
     patient = Patient(user_id=user.id)
     db.session.add(patient)
     db.session.commit()
 
     access_token = create_access_token(
-        identity={"id": user.id, "role": user.role}, expires_delta=timedelta(days=1)
+        identity=str(user.id),
+        additional_claims={"role": user.role},
+        expires_delta=timedelta(days=1)
     )
-    return jsonify({"message": "Registration successful", "token": access_token}), 201
+
+    return jsonify({
+        "message": "Registration successful",
+        "token": access_token,
+        "role": user.role
+    }), 201
+
 
 #  POST /auth/login  -> All roles
 @auth_bp.route("/login", methods=["POST"])
@@ -54,19 +64,23 @@ def login():
         return jsonify({"error": "Account deactivated"}), 403
 
     token = create_access_token(
-        identity={"id": user.id, "role": user.role}, expires_delta=timedelta(days=1)
+        identity=str(user.id),
+        additional_claims={"role": user.role},
+        expires_delta=timedelta(days=1)
     )
+
     return jsonify({"token": token, "role": user.role}), 200
 
-#  POST /auth/logout  - Client logs out
+
+#  POST /auth/logout
 @auth_bp.route("/logout", methods=["POST"])
 @jwt_required()
 def logout():
-    current_user = get_jwt_identity()
-    return jsonify({"message": f"User {current_user['id']} logged out successfully"}), 200
+    user_id = int(get_jwt_identity())
+    return jsonify({"message": f"User {user_id} logged out successfully"}), 200
 
 
-#  PUT /auth/reset-password  -> Send password reset link
+#  PUT /auth/reset-password
 @auth_bp.route("/reset-password", methods=["PUT"])
 def reset_password():
     data = request.get_json()
@@ -80,30 +94,27 @@ def reset_password():
     send_reset_email(email, token)
     return jsonify({"message": "Password reset link sent"}), 200
 
-#  PUT /auth/change-password  -> Authenticated user
+
+#  PUT /auth/change-password
 @auth_bp.route("/change-password", methods=["PUT"])
 @jwt_required()
 def change_password():
-    data = request.get_json()
-    old_password = data.get("old_password")
-    new_password = data.get("new_password")
-
     user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
 
-    if not user.check_password(old_password):
+    data = request.get_json()
+    if not user.check_password(data.get("old_password")):
         return jsonify({"error": "Incorrect old password"}), 400
 
-    user.set_password(new_password)
+    user.set_password(data.get("new_password"))
     db.session.commit()
     return jsonify({"message": "Password changed successfully"}), 200
 
 
-#  GET /auth/setup-password/<token>  -> Invite activation
+#  GET/POST — Invite Activation
 @auth_bp.route("/setup-password/<token>", methods=["GET", "POST"])
 def setup_password(token):
     pending = PendingUser.query.filter_by(invite_token=token, is_accepted=False).first()
-
     if not pending:
         return jsonify({"error": "Invalid or expired invite link"}), 400
 
@@ -116,15 +127,12 @@ def setup_password(token):
 
     data = request.get_json()
     password = data.get("password")
-
     if not password:
         return jsonify({"error": "Password is required"}), 400
 
-    # Check if already activated
     if User.query.filter_by(email=pending.email).first():
         return jsonify({"error": "User already activated"}), 400
 
-    # Create the user with bcrypt hashing
     user = User(
         name=pending.name,
         email=pending.email,
@@ -136,7 +144,6 @@ def setup_password(token):
     db.session.add(user)
     db.session.flush()
 
-    #  Linked profiles based on role
     role = pending.role.lower()
     if role == "doctor":
         db.session.add(Doctor(user_id=user.id, hospital_id=pending.hospital_id))
@@ -151,7 +158,7 @@ def setup_password(token):
     db.session.commit()
 
     token = create_access_token(
-        identity=user.id,
+        identity=str(user.id),
         additional_claims={"role": user.role},
         expires_delta=timedelta(hours=2)
     )
@@ -166,4 +173,3 @@ def setup_password(token):
             "role": user.role
         }
     }), 201
-

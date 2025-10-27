@@ -26,10 +26,20 @@ def get_all_appointments():
 
 # GET /appointments/<id> (Admin or Patient Owner)
 @appointment_bp.route("/<int:id>", methods=["GET"])
-@role_required("admin", "patient")
-@patient_owns_appointment
+@role_required("admin", "patient", "doctor")
 def get_appointment(id):
+    identity = get_jwt_identity()
+    user_id = int(identity)
+    role = get_jwt().get("role")
+
     appt = Appointment.query.get_or_404(id)
+
+    # Ownership Logic
+    if role == "patient" and user_id != appt.patient_id:
+        return jsonify({"error": "Not your appointment"}), 403
+    if role == "doctor" and user_id != appt.doctor_id:
+        return jsonify({"error": "Not your patient"}), 403
+
     return jsonify({
         "id": appt.id,
         "patient_id": appt.patient_id,
@@ -39,6 +49,7 @@ def get_appointment(id):
         "time": str(appt.time),
         "status": appt.status
     }), 200
+
 
 
 # POST /appointments (Patients only)

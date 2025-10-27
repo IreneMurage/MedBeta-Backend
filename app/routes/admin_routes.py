@@ -15,7 +15,7 @@ superadmin_bp = Blueprint("superadmin_bp", __name__, url_prefix="/admin")
 @role_required("superadmin")
 def invite_user():
     data = request.get_json()
-    print("DEBUG data:", data, type(data))
+    # print("DEBUG data:", data, type(data))
     email = data.get("email")
     name = data.get("name")
     role = data.get("role")

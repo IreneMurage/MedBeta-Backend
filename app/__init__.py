@@ -11,14 +11,14 @@ from app.routes import auth_bp, appointment_bp, medical_bp, superadmin_bp
 bcrypt = Bcrypt()
 jwt = JWTManager()
 
-# Fix for 422 "Subject must be a string"
-@jwt.user_identity_loader
-def user_identity_lookup(identity):
-    return str(identity["id"]) 
+# # Fix for 422 "Subject must be a string"
+# @jwt.user_identity_loader
+# def user_identity_lookup(identity):
+#     return str(identity["id"]) 
 
-@jwt.additional_claims_loader
-def add_claims_to_access_token(identity):
-    return {"role": identity["role"]}  # store role in token claims
+# @jwt.additional_claims_loader
+# def add_claims_to_access_token(identity):
+#     return {"role": identity["role"]}  # store role in token claims
 
 def create_superadmin_if_needed():
     from app.models import User

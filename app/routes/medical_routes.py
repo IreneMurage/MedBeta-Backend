@@ -7,6 +7,32 @@ from app.utils.log_access import log_access
 
 medical_bp = Blueprint("medical_bp", __name__, url_prefix="/medical-records")
 
+def serialize_record(r):
+    appointment = Appointment.query.get(r.appointment_id)
+    doctor = Doctor.query.get(r.doctor_id)
+    patient = Patient.query.get(r.patient_id)
+
+    return {
+        "id": r.id,
+        "diagnosis": r.diagnosis,
+        "treatment": r.treatment,
+        "notes": r.notes,
+        "doctor": {
+            "id": doctor.id,
+            "name": doctor.name,
+            "specialization": doctor.specialization
+        } if doctor else None,
+        "patient": {
+            "id": patient.id,
+            "full_name": patient.full_name
+        } if patient else None,
+        "appointment": {
+            "id": appointment.id,
+            "date": str(appointment.date),
+            "time": str(appointment.time)
+        } if appointment else None,
+        "created_at": r.created_at.isoformat()
+    }
 
 # GET all records for a specific patient
 @medical_bp.route("/patient/<int:patient_id>", methods=["GET"])
@@ -32,17 +58,8 @@ def get_records_for_patient(patient_id):
 
     records = MedicalRecord.query.filter_by(patient_id=patient_id).all()
 
-    return jsonify([
-        {
-            "id": r.id,
-            "diagnosis": r.diagnosis,
-            "treatment": r.treatment,
-            "doctor_id": r.doctor_id,
-            "appointment_id": r.appointment_id,
-            "created_at": r.created_at.isoformat()
-        }
-        for r in records
-    ]), 200
+    return jsonify([serialize_record(r) for r in records]), 200
+
 
 
 # POST — Doctor only
@@ -83,7 +100,11 @@ def create_record():
     db.session.add(new_record)
     db.session.commit()
 
-    return jsonify({"message": "Medical record created", "id": new_record.id}), 201
+    return jsonify({
+    "message": "Medical record created",
+    "record": serialize_record(new_record)
+}), 201
+
 
 
 # PUT — Only owning doctor or admin
@@ -105,7 +126,11 @@ def update_record(id):
         record.treatment = data.get("treatment", record.treatment)
         record.notes = data.get("notes", record.notes)
         db.session.commit()
-        return jsonify({"message": "Record updated"}), 200
+        return jsonify({
+    "message": "Record updated",
+    "record": serialize_record(record)
+}), 200
+
 
     return jsonify({"error": "Forbidden"}), 403
 
