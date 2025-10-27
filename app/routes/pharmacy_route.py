@@ -5,7 +5,7 @@ from app.db import db
 from app.models.Pharmacy import Pharmacy
 from app.models.prescriptions import Prescription
 from app.models.users import User
-from app.utils.decorators import role_required
+from app.utils.role_required import role_required
 
 pharmacy_bp = Blueprint("pharmacy_bp", __name__)
 
