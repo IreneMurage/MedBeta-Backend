@@ -8,7 +8,7 @@ from datetime import timedelta
 import os
 from app.routes import auth_bp, appointment_bp, medical_bp, superadmin_bp
 
-from app.routes.patient import patient_bp
+from app.routes.patient_routes import patient_bp
 
 bcrypt = Bcrypt()
 jwt = JWTManager()
@@ -69,6 +69,9 @@ def create_app():
     app.register_blueprint(appointment_bp, url_prefix='/appointments')
     app.register_blueprint(medical_bp, url_prefix='/medical-records')
     app.register_blueprint(superadmin_bp, url_prefix='/admin')
+    app.register_blueprint(patient_bp, url_prefix='/patients')
+    
+
 
 
     # Ensure SuperAdmin exists
@@ -76,8 +79,8 @@ def create_app():
         db.create_all()
         create_superadmin_if_needed()
 
-    # ✅ Register Blueprints
-    app.register_blueprint(patient_bp)
+    #  Register Blueprints
+    # app.register_blueprint(patient_bp)
 
     @app.route("/")
     def home():
