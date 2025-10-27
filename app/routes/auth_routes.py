@@ -145,14 +145,33 @@ def setup_password(token):
     db.session.flush()
 
     role = pending.role.lower()
+
     if role == "doctor":
         db.session.add(Doctor(user_id=user.id, hospital_id=pending.hospital_id))
+
     elif role == "pharmacy":
         db.session.add(Pharmacy(user_id=user.id))
+
     elif role in ("labtech", "technician"):
         db.session.add(Technician(user_id=user.id))
+
     elif role == "hospital":
-        db.session.add(Hospital(user_id=user.id))
+        hospital_name = data.get("hospital_name")
+        license_number = data.get("license_number")
+        location = data.get("location")
+
+        # Validate required hospital fields
+        if not hospital_name:
+            return jsonify({"error": "Hospital name is required"}), 400
+
+        db.session.add(Hospital(
+            user_id=user.id,
+            name=hospital_name,
+            license_number=license_number,
+            location=location,
+            is_verified=False,
+            agreement_signed=False
+        ))
 
     pending.is_accepted = True
     db.session.commit()
@@ -173,3 +192,4 @@ def setup_password(token):
             "role": user.role
         }
     }), 201
+
