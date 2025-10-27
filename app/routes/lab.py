@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app.db import db
 from app.models import Technician, TestRequest, User, Patient
-from app.decorators import role_required
+from app.utils.role_required import role_required
 
 lab_bp = Blueprint("lab_bp", __name__)
 

@@ -6,9 +6,7 @@ from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
 import os
-from app.routes import auth_bp, appointment_bp, medical_bp, superadmin_bp
-
-from app.routes.patient import patient_bp
+from app.routes import auth_bp, appointment_bp, medical_bp, superadmin_bp, patient_bp, doctor_bp, hospital_bp, lab_bp, pharmacy_bp, prescription_bp
 
 bcrypt = Bcrypt()
 jwt = JWTManager()
@@ -30,7 +28,7 @@ def create_superadmin_if_needed():
     name = os.getenv("SUPERADMIN_NAME", "Super Admin")
 
     if not email or not password:
-        print("⚠️ SUPERADMIN credentials not set in .env")
+        print(" SUPERADMIN credentials not set in .env")
         return
 
     existing_user = User.query.filter_by(email=email).first()
@@ -58,15 +56,6 @@ def create_app():
 
     # Initialize db and migrations
     db.init_app(app)
-    migrate.init_app(app,db)
-    bcrypt.init_app(app)
-    CORS(app, supports_credentials=True)
-    jwt.init_app(app)
-
-
-
-    
-    return app
     migrate.init_app(app, db)
 
     # Initialize bcrypt
@@ -74,24 +63,25 @@ def create_app():
     # initialize JWT
     jwt.init_app(app)
 
+    # CORS(app, supports_credentials=True)
+
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(appointment_bp, url_prefix='/appointments')
     app.register_blueprint(medical_bp, url_prefix='/medical-records')
     app.register_blueprint(superadmin_bp, url_prefix='/admin')
+    app.register_blueprint(patient_bp)
+    app.register_blueprint(doctor_bp)
+    app.register_blueprint(hospital_bp)
+    app.register_blueprint(lab_bp)
+    app.register_blueprint(pharmacy_bp)
+    app.register_blueprint(prescription_bp)
 
 
     # Ensure SuperAdmin exists
     with app.app_context():
         db.create_all()
         create_superadmin_if_needed()
-
-    # ✅ Register Blueprints
-    app.register_blueprint(patient_bp)
-
-    @app.route("/")
-    def home():
-        return {"message": "MedBeta API is running"}
     
 
     return app

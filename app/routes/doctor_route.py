@@ -3,11 +3,11 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app.db import db
 from app.models import Doctor, Appointment, Patient, MedicalRecord, AccessLog, User
-from app.decorators import role_required
+from app.utils.role_required import role_required
 
 doctor_bp = Blueprint("doctor_bp", __name__)
 
-# 🩺 GET /doctors/<id> — View doctor profile
+# GET /doctors/<id> — View doctor profile
 @doctor_bp.route("/<int:id>", methods=["GET"])
 @jwt_required()
 @role_required("doctor")
@@ -26,7 +26,7 @@ def get_doctor_profile(id):
     return jsonify(data), 200
 
 
-# 🩺 PUT /doctors/<id> — Update doctor profile
+#  PUT /doctors/<id> — Update doctor profile
 @doctor_bp.route("/<int:id>", methods=["PUT"])
 @jwt_required()
 @role_required("doctor")
@@ -60,8 +60,7 @@ def get_doctor_appointments(id):
         for a in appointments
     ]), 200
 
-
-# ✅ PUT /doctors/<id>/appointments/<appointment_id>/status — Update appointment status
+# PUT /doctors/<id>/appointments/<appointment_id>/status — Update appointment status
 @doctor_bp.route("/<int:id>/appointments/<int:appointment_id>/status", methods=["PUT"])
 @jwt_required()
 @role_required("doctor")
@@ -115,7 +114,7 @@ def add_or_update_medical_record(id):
     return jsonify({"message": message}), 201
 
 
-# 👩‍⚕️ GET /doctors/<id>/patients — View all patients seen by the doctor
+#  GET /doctors/<id>/patients — View all patients seen by the doctor
 @doctor_bp.route("/<int:id>/patients", methods=["GET"])
 @jwt_required()
 @role_required("doctor")
@@ -139,7 +138,7 @@ def get_doctor_patients(id):
     ]), 200
 
 
-# 📜 GET /doctors/<id>/access-logs — View audit trail of which patient files the doctor accessed
+#  GET /doctors/<id>/access-logs — View audit trail of which patient files the doctor accessed
 @doctor_bp.route("/<int:id>/access-logs", methods=["GET"])
 @jwt_required()
 @role_required("doctor")

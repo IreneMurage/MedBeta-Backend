@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app.db import db
-from app.models.prescription import Prescription
+from app.models.prescriptions import Prescription
 from app.models.doctor import Doctor
 from app.models.patient import Patient
 from datetime import datetime
