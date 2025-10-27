@@ -18,3 +18,7 @@ def create_app():
     bcrypt.init_app(app)
 
     return app
+
+
+
+
