@@ -7,20 +7,21 @@ def patient_owns_appointment(fn):
     @wraps(fn)
     @jwt_required()
     def wrapper(id, *args, **kwargs):
-        identity = get_jwt_identity()
+        user_id = int(get_jwt_identity())  # ✅ convert
         appt = Appointment.query.get_or_404(id)
-        if identity.get("id") != appt.patient_id:
+        if appt.patient_id != user_id:
             return jsonify({"error": "Not your appointment"}), 403
         return fn(id, *args, **kwargs)
     return wrapper
+
 
 def doctor_owns_appointment(fn):
     @wraps(fn)
     @jwt_required()
     def wrapper(id, *args, **kwargs):
-        identity = get_jwt_identity()
+        user_id = int(get_jwt_identity())  # ✅ convert
         appt = Appointment.query.get_or_404(id)
-        if identity.get("id") != appt.doctor_id:
+        if appt.doctor_id != user_id:
             return jsonify({"error": "Not your patient"}), 403
         return fn(id, *args, **kwargs)
     return wrapper

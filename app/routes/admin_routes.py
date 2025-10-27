@@ -15,6 +15,7 @@ superadmin_bp = Blueprint("superadmin_bp", __name__, url_prefix="/admin")
 @role_required("superadmin")
 def invite_user():
     data = request.get_json()
+    print("DEBUG data:", data, type(data))
     email = data.get("email")
     name = data.get("name")
     role = data.get("role")
@@ -72,15 +73,16 @@ def invite_user():
 @superadmin_bp.route("/pending-invites", methods=["GET"])
 @role_required("superadmin")
 def pending_invites():
-    invites = PendingUser.query.all()
+    invites = PendingUser.query.filter_by(is_accepted=False).all()
     return jsonify([{
         "id": inv.id,
         "email": inv.email,
         "role": inv.role,
         "hospital_id": inv.hospital_id,
         "is_accepted": inv.is_accepted,
-        "expires_at": str(inv.expires_at)
+        "expires_at": inv.expires_at.isoformat() if inv.expires_at else None
     } for inv in invites]), 200
+
 
 #  GET /admin/pending-hospitals
 @superadmin_bp.route("/pending-hospitals", methods=["GET"])

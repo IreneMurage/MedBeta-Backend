@@ -1,10 +1,9 @@
 from flask import Blueprint, request, jsonify
 from app.db import db
 from app.models import Appointment
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from app.utils.role_required import role_required
 from app.utils.owns_appointment import patient_owns_appointment, doctor_owns_appointment
-
 
 appointment_bp = Blueprint("appointments", __name__, url_prefix="/appointments")
 
@@ -25,13 +24,12 @@ def get_all_appointments():
     } for appt in appointments]), 200
 
 
-# GET /appointments/<id> (Admin or Owner Patient)
+# GET /appointments/<id> (Admin or Patient Owner)
 @appointment_bp.route("/<int:id>", methods=["GET"])
 @role_required("admin", "patient")
 @patient_owns_appointment
 def get_appointment(id):
     appt = Appointment.query.get_or_404(id)
-
     return jsonify({
         "id": appt.id,
         "patient_id": appt.patient_id,
@@ -43,15 +41,15 @@ def get_appointment(id):
     }), 200
 
 
-# POST /appointments (ONLY Patients)
+# POST /appointments (Patients only)
 @appointment_bp.route("/", methods=["POST"])
 @role_required("patient")
 def create_appointment():
-    identity = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     data = request.json
 
     new_appt = Appointment(
-        patient_id=identity.get("id"),
+        patient_id=user_id,
         doctor_id=data.get("doctor_id"),
         hospital_id=data.get("hospital_id"),
         date=data.get("date"),
@@ -60,17 +58,18 @@ def create_appointment():
 
     db.session.add(new_appt)
     db.session.commit()
-
     return jsonify({"message": "Appointment created", "id": new_appt.id}), 201
 
 
-# PUT /appointments/<id> (Patient update… Doctor confirm/reject… Admin full control)
+# PUT /appointments/<id>
+# Patient → Reschedule
+# Doctor → Accept/Decline
+# Admin → Full control
 @appointment_bp.route("/<int:id>", methods=["PUT"])
 @role_required("patient", "doctor", "admin")
 def update_appointment(id):
-    identity = get_jwt_identity()
-    role = identity.get("role")
-    user_id = identity.get("id")
+    user_id = int(get_jwt_identity())
+    role = get_jwt().get("role")
 
     appt = Appointment.query.get_or_404(id)
     data = request.json
@@ -99,16 +98,12 @@ def update_appointment(id):
     return jsonify({"message": "Appointment updated", "status": appt.status}), 200
 
 
-# DELETE /appointments/<id> (Patient owns OR Admin)
+# DELETE /appointments/<id> (Owner or Admin)
 @appointment_bp.route("/<int:id>", methods=["DELETE"])
 @role_required("patient", "admin")
 @patient_owns_appointment
 def delete_appointment(id):
     appt = Appointment.query.get_or_404(id)
-
     db.session.delete(appt)
     db.session.commit()
-    
     return jsonify({"message": "Appointment cancelled"}), 200
-
-
