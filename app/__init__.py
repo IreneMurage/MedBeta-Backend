@@ -7,6 +7,8 @@ from flask_jwt_extended import JWTManager
 from datetime import timedelta
 import os
 from app.routes import auth_bp, appointment_bp, medical_bp, superadmin_bp, patient_bp, doctor_bp, hospital_bp, lab_bp, pharmacy_bp, prescription_bp
+from flask_cors import CORS
+
 
 bcrypt = Bcrypt()
 jwt = JWTManager()
@@ -57,13 +59,10 @@ def create_app():
     # Initialize db and migrations
     db.init_app(app)
     migrate.init_app(app, db)
-
-    # Initialize bcrypt
     bcrypt.init_app(app)
-    # initialize JWT
     jwt.init_app(app)
+    CORS(app, supports_credentials=True)
 
-    # CORS(app, supports_credentials=True)
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix='/auth')
