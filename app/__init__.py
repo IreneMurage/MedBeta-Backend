@@ -1,12 +1,14 @@
 from flask import Flask
 from .config import Config
-from .db import db,migrate
+from .db import db, migrate
 from .models import *
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
 import os
 from app.routes import auth_bp, appointment_bp, medical_bp, superadmin_bp
+
+from app.routes.patient import patient_bp
 
 bcrypt = Bcrypt()
 jwt = JWTManager()
@@ -49,15 +51,15 @@ def create_superadmin_if_needed():
 
 
 def create_app():
-    app=Flask(__name__)
+    app = Flask(__name__)
     app.config.from_object(Config)
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 
-    # initialize db
+    # Initialize db and migrations
     db.init_app(app)
-    migrate.init_app(app,db)
+    migrate.init_app(app, db)
 
-    # initialize bcrypt
+    # Initialize bcrypt
     bcrypt.init_app(app)
     # initialize JWT
     jwt.init_app(app)
@@ -73,5 +75,13 @@ def create_app():
     with app.app_context():
         db.create_all()
         create_superadmin_if_needed()
+
+    # ✅ Register Blueprints
+    app.register_blueprint(patient_bp)
+
+    @app.route("/")
+    def home():
+        return {"message": "MedBeta API is running"}
+    
 
     return app
