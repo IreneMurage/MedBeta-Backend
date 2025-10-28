@@ -6,8 +6,9 @@ from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
 import os
-from app.routes import auth_bp, appointment_bp, medical_bp, superadmin_bp, patient_bp, doctor_bp, hospital_bp, lab_bp, pharmacy_bp, prescription_bp
+from app.routes import auth_bp, appointment_bp, medical_bp, superadmin_bp, patient_bp, doctor_bp, hospital_bp, lab_bp, pharmacy_bp, prescription_bp, review_bp
 from flask_cors import CORS
+
 
 
 bcrypt = Bcrypt()
@@ -75,6 +76,7 @@ def create_app():
     app.register_blueprint(lab_bp)
     app.register_blueprint(pharmacy_bp)
     app.register_blueprint(prescription_bp)
+    app.register_blueprint(review_bp, url_prefix='/reviews')
 
 
     # Ensure SuperAdmin exists
