@@ -111,7 +111,31 @@ def change_password():
     return jsonify({"message": "Password changed successfully"}), 200
 
 
-#  GET/POST — Invite Activation
+# POST /auth/reset-password/<token>
+@auth_bp.route("/reset-password/<token>", methods=["POST"])
+def confirm_reset_password(token):
+    data = request.get_json()
+    new_password = data.get("new_password")
+
+    if not new_password:
+        return jsonify({"error": "New password is required"}), 400
+
+    # Verify token and extract email
+    email = verify_token(token)
+    if not email:
+        return jsonify({"error": "Invalid or expired token"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    user.set_password(new_password)
+    db.session.commit()
+
+    return jsonify({"message": "Password reset successful"}), 200
+
+
+#  ET/POST — Invite Activation
 @auth_bp.route("/setup-password/<token>", methods=["GET", "POST"])
 def setup_password(token):
     pending = PendingUser.query.filter_by(invite_token=token, is_accepted=False).first()
