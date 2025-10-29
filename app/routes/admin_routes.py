@@ -51,7 +51,7 @@ def invite_user():
         sent = send_invite_email(email, token)
         if not sent:
             return jsonify({
-                "warning": "Invite created but email not sent (check SendGrid config)",
+                # "warning": "Invite created but email not sent (check SendGrid config)",
                 "invite_token": token
             }), 201
     except Exception as e:
@@ -106,6 +106,33 @@ def approve_hospital(id):
     # Optional: send invite to hospital admin
     return jsonify({"message": f"Hospital {hospital.name} approved"}), 200
 
+# GET /admin/pending-staff
+@superadmin_bp.route("/pending-staff", methods=["GET"])
+@role_required("superadmin")
+def pending_staff():
+    # Define which staff roles to include
+    roles = ["doctor", "technician", "lab_tech", "pharmacist"]
+
+    # Filter pending users who match these roles and haven't accepted yet
+    pending = PendingUser.query.filter(
+        PendingUser.role.in_(roles),
+        PendingUser.is_accepted == False
+    ).all()
+
+    # Return a structured JSON list
+    return jsonify([
+        {
+            "id": p.id,
+            "name": p.name,
+            "email": p.email,
+            "role": p.role,
+            "hospital_id": p.hospital_id,
+            "hospital_name": p.hospital.name if p.hospital else None,
+            "created_at": p.created_at.isoformat(),
+            "expires_at": p.expires_at.isoformat() if p.expires_at else None,
+        }
+        for p in pending
+    ]), 200
 
 #  GET /admin/pending-doctors
 @superadmin_bp.route("/pending-doctors", methods=["GET"])
@@ -119,6 +146,28 @@ def pending_doctors():
         "hospital_id": p.hospital_id
     } for p in pending]), 200
 
+@superadmin_bp.route("/users", methods=["GET"])
+@role_required("superadmin")
+def get_all_users():
+    """
+    Get all users in the system except hospital accounts.
+    """
+    # Exclude hospital admins — assuming role='hospital' is used for them
+    users = User.query.filter(User.role != "hospital").all()
+
+    return jsonify([
+        {
+            "id": u.id,
+            "name": u.name,
+            "email": u.email,
+            "role": u.role,
+            "status": u.status,
+            "is_active": u.is_active,
+            "created_at": u.created_at.isoformat(),
+        }
+        for u in users
+    ]), 200
+
 
 #  PUT /admin/approve-doctor/<id>
 @superadmin_bp.route("/approve-doctor/<int:id>", methods=["PUT"])
@@ -128,7 +177,7 @@ def approve_doctor(id):
     pending.is_accepted = True
     db.session.commit()
     # Optional: send invite email
-    # send_invite_email(pending.email, pending.invite_token)
+    send_invite_email(pending.email, pending.invite_token)
     return jsonify({"message": f"Doctor {pending.name} approved"}), 200
 
 
@@ -245,3 +294,26 @@ def upload_staff():
         "message": f"Invites sent successfully to {len(invites_sent)} users",
         "emails": invites_sent
     }), 201
+
+
+@superadmin_bp.route("/hospitals", methods=["GET"])
+@role_required("superadmin")
+def get_hospitals():
+    try:
+        hospitals = Hospital.query.all()
+        return jsonify([
+            {
+                "id": h.id,
+                "name": h.name,
+                "email": h.user.email if h.user else None,
+                "location": h.location,
+                "license_number": h.license_number,
+                "is_verified": h.is_verified,
+                "agreement_signed": h.agreement_signed,
+            }
+            for h in hospitals
+        ]), 200
+    except Exception as e:
+        print(f"Error fetching hospitals: {e}")
+        return jsonify({"error": "Failed to retrieve hospitals"}), 500
+

@@ -96,6 +96,7 @@ def create_app():
         create_superadmin_if_needed()
 
 
+
     #  Register Blueprints
     # app.register_blueprint(patient_bp)
 
@@ -105,5 +106,10 @@ def create_app():
 
     
 
+
+    #  Close sessions after each request
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        db.session.remove()
     return app
   

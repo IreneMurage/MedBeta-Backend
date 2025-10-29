@@ -111,7 +111,31 @@ def change_password():
     return jsonify({"message": "Password changed successfully"}), 200
 
 
-#  GET/POST — Invite Activation
+# POST /auth/reset-password/<token>
+@auth_bp.route("/reset-password/<token>", methods=["POST"])
+def confirm_reset_password(token):
+    data = request.get_json()
+    new_password = data.get("new_password")
+
+    if not new_password:
+        return jsonify({"error": "New password is required"}), 400
+
+    # Verify token and extract email
+    email = verify_token(token)
+    if not email:
+        return jsonify({"error": "Invalid or expired token"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    user.set_password(new_password)
+    db.session.commit()
+
+    return jsonify({"message": "Password reset successful"}), 200
+
+
+# ET/POST — Invite Activation
 @auth_bp.route("/setup-password/<token>", methods=["GET", "POST"])
 def setup_password(token):
     pending = PendingUser.query.filter_by(invite_token=token, is_accepted=False).first()
@@ -133,6 +157,7 @@ def setup_password(token):
     if User.query.filter_by(email=pending.email).first():
         return jsonify({"error": "User already activated"}), 400
 
+    # Create the user
     user = User(
         name=pending.name,
         email=pending.email,
@@ -142,21 +167,62 @@ def setup_password(token):
     )
     user.set_password(password)
     db.session.add(user)
-    db.session.flush()
+    db.session.flush()  # ensures user.id is available
 
     role = pending.role.lower()
+
     if role == "doctor":
-        db.session.add(Doctor(user_id=user.id, hospital_id=pending.hospital_id))
-    elif role == "pharmacy":
-        db.session.add(Pharmacy(user_id=user.id))
+        license_number = data.get("license_number")
+        specialization = data.get("specialization")
+        if not license_number:
+            return jsonify({"error": "License number is required"}), 400
+
+        db.session.add(Doctor(
+            user_id=user.id,
+            hospital_id=pending.hospital_id,
+            license_number=license_number,
+            specialization=specialization
+        ))
+
+    elif role in ("pharmacy", "pharmacist"):
+        name = data.get("name")
+        location = data.get("location")
+        license_number = data.get("license_number")
+        if not name:
+            return jsonify({"error": "Pharmacy name is required"}), 400
+
+        db.session.add(Pharmacy(
+            user_id=user.id,
+            name=name,
+            location=location,
+            license_number=license_number
+        ))
+
     elif role in ("labtech", "technician"):
         db.session.add(Technician(user_id=user.id))
-    elif role == "hospital":
-        db.session.add(Hospital(user_id=user.id))
 
+    elif role in ("hospital", "hospital_admin"):
+        hospital_name = data.get("hospital_name")
+        license_number = data.get("license_number")
+        location = data.get("location")
+
+        if not hospital_name:
+            return jsonify({"error": "Hospital name is required"}), 400
+
+        db.session.add(Hospital(
+            user_id=user.id,
+            name=hospital_name,
+            license_number=license_number,
+            location=location,
+            is_verified=False,
+            agreement_signed=False
+        ))
+
+    # Mark the invite as accepted
     pending.is_accepted = True
     db.session.commit()
 
+    # Generate access token
     token = create_access_token(
         identity=str(user.id),
         additional_claims={"role": user.role},
@@ -173,3 +239,4 @@ def setup_password(token):
             "role": user.role
         }
     }), 201
+
