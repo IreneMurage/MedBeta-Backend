@@ -4,11 +4,13 @@ from app.models.prescriptions import Prescription
 from app.models.doctor import Doctor
 from app.models.patient import Patient
 from datetime import datetime
+from app.utils.role_required import role_required  
 
 prescription_bp = Blueprint("prescription_bp", __name__)
 
-# CREATE PRESCRIPTION (Doctor → Pharmacy)
+# creating prescriptions(Doctor → Pharmacy)
 @prescription_bp.post("/prescriptions")
+@role_required("doctor")  
 def create_prescription():
     data = request.get_json()
 
@@ -48,8 +50,9 @@ def create_prescription():
     }), 201
 
 
-# GET ALL PRESCRIPTIONS (Pharmacy Dashboard View)
+# get prescriptions(only Pharmacy & Admin can View)
 @prescription_bp.get("/prescriptions")
+@role_required("pharmacy", "admin")
 def get_all_prescriptions():
     prescriptions = Prescription.query.order_by(Prescription.issued_date.desc()).all()
     result = []
@@ -66,8 +69,9 @@ def get_all_prescriptions():
     return jsonify(result), 200
 
 
-#GET PRESCRIPTIONS FOR A SPECIFIC PATIENT
+# get prescription for a specific patient
 @prescription_bp.get("/prescriptions/patient/<int:patient_id>")
+@role_required("patient", "doctor", "admin")
 def get_prescriptions_by_patient(patient_id):
     prescriptions = Prescription.query.filter_by(patient_id=patient_id).all()
     if not prescriptions:
@@ -83,8 +87,9 @@ def get_prescriptions_by_patient(patient_id):
     return jsonify(result), 200
 
 
-# GET PRESCRIPTIONS BY DOCTOR
+#get prescription by doctor
 @prescription_bp.get("/prescriptions/doctor/<int:doctor_id>")
+@role_required("doctor", "admin")
 def get_prescriptions_by_doctor(doctor_id):
     prescriptions = Prescription.query.filter_by(doctor_id=doctor_id).all()
     if not prescriptions:
@@ -100,8 +105,9 @@ def get_prescriptions_by_doctor(doctor_id):
     return jsonify(result), 200
 
 
-# DELETE PRESCRIPTION (Doctor/Admin only)
+# Delete prescription (Doctor/Admin only)
 @prescription_bp.delete("/prescriptions/<int:id>")
+@role_required("doctor", "admin")
 def delete_prescription(id):
     prescription = Prescription.query.get(id)
     if not prescription:

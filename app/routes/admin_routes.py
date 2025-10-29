@@ -51,7 +51,7 @@ def invite_user():
         sent = send_invite_email(email, token)
         if not sent:
             return jsonify({
-                "warning": "Invite created but email not sent (check SendGrid config)",
+                # "warning": "Invite created but email not sent (check SendGrid config)",
                 "invite_token": token
             }), 201
     except Exception as e:
