@@ -13,23 +13,19 @@ import logging
 
 patient_bp = Blueprint("patient", __name__, url_prefix="/patients")
 
-# ---------------- Helper Function ----------------
+# -----------------------------------
+# Helper: get logged-in patient safely
+# -----------------------------------
 def get_current_patient():
-    """Safely get the logged-in patient."""
-    try:
-        identity = get_jwt_identity()
-        user_id = identity["id"] if isinstance(identity, dict) else int(identity)
-    except Exception:
-        return None, jsonify({"error": "Invalid authentication identity"}), 401
-
+    user_id = int(get_jwt_identity())
     patient = Patient.query.filter_by(user_id=user_id).first()
     if not patient:
         return None, jsonify({"error": "Patient not found"}), 404
-
     return patient, None, None
 
-
-# ---------------- Patient Profile ----------------
+# -------------------------------
+# GET: View patient profile
+# -------------------------------
 @patient_bp.route("/profile", methods=["GET"])
 @role_required("patient")
 def get_patient_profile():
@@ -40,11 +36,12 @@ def get_patient_profile():
     return jsonify({
         "id": patient.id,
         "phone": patient.phone,
-        "address": patient.address,
-        "dob": getattr(patient, "dob", None)
+        "address": patient.address
     }), 200
 
-
+# -------------------------------
+# PUT: Update patient profile
+# -------------------------------
 @patient_bp.route("/profile", methods=["PUT"])
 @role_required("patient")
 def update_patient_profile():
@@ -55,12 +52,6 @@ def update_patient_profile():
     data = request.get_json() or {}
     allowed_fields = ["phone", "address", "dob"]
 
-    if "dob" in data and data["dob"]:
-        try:
-            datetime.strptime(data["dob"], "%Y-%m-%d")
-        except ValueError:
-            return jsonify({"error": "Invalid date format for dob. Use YYYY-MM-DD"}), 400
-
     for field in allowed_fields:
         if field in data:
             setattr(patient, field, data[field])
@@ -70,11 +61,12 @@ def update_patient_profile():
         return jsonify({"message": "Profile updated successfully"}), 200
     except Exception as e:
         db.session.rollback()
-        logging.error("Error updating patient profile: %s", e)
+        logging.error(f"Error updating patient profile: {e}")
         return jsonify({"error": "Failed to update profile"}), 500
 
-
-# ---------------- Medical Records ----------------
+# -------------------------------
+# GET: View all medical records
+# -------------------------------
 @patient_bp.route("/medical-records", methods=["GET"])
 @role_required("patient")
 def get_medical_records():
@@ -83,18 +75,17 @@ def get_medical_records():
         return err, code
 
     records = MedicalRecord.query.filter_by(patient_id=patient.id).all()
+    if not records:
+        return jsonify({"message": "No medical records found"}), 404
+
     return jsonify([
-        {
-            "id": r.id,
-            "diagnosis": r.diagnosis,
-            "treatment": r.treatment,
-            "date": r.date.isoformat() if getattr(r, "date", None) else None
-        }
+        {"id": r.id, "diagnosis": r.diagnosis, "treatment": r.treatment}
         for r in records
     ]), 200
 
-
-# ---------------- Appointments ----------------
+# -------------------------------
+# POST: Book new appointment
+# -------------------------------
 @patient_bp.route("/appointments", methods=["POST"])
 @role_required("patient")
 def book_appointment():
@@ -112,22 +103,11 @@ def book_appointment():
     try:
         appointment_date = datetime.strptime(data["date"], "%Y-%m-%d").date()
         appointment_time = datetime.strptime(data["time"], "%H:%M").time()
-    except ValueError:
-        return jsonify({
-            "error": "Invalid date or time format. Expected 'YYYY-MM-DD' and 'HH:MM'"
-        }), 400
-
-    if appointment_date < datetime.utcnow().date():
-        return jsonify({"error": "Cannot book appointment for past dates"}), 400
-
-    try:
-        doctor_id = int(data["doctor_id"])
-        hospital_id = int(data["hospital_id"])
 
         new_appointment = Appointment(
             patient_id=patient.id,
-            doctor_id=doctor_id,
-            hospital_id=hospital_id,
+            doctor_id=data["doctor_id"],
+            hospital_id=data["hospital_id"],
             date=appointment_date,
             time=appointment_time,
             status="pending"
@@ -148,12 +128,17 @@ def book_appointment():
             }
         }), 201
 
+    except ValueError:
+        return jsonify({
+            "error": "Invalid date or time format. Expected 'YYYY-MM-DD' and 'HH:MM'"
+        }), 400
     except Exception as e:
         db.session.rollback()
-        logging.error("Error booking appointment: %s", e)
-        return jsonify({"error": "Failed to book appointment"}), 500
+        return jsonify({"error": str(e)}), 500
 
-
+# -------------------------------
+# GET: All appointments for patient
+# -------------------------------
 @patient_bp.route("/appointments", methods=["GET"])
 @role_required("patient")
 def get_appointments():
@@ -161,21 +146,18 @@ def get_appointments():
     if err:
         return err, code
 
-    appointments = Appointment.query.filter_by(patient_id=patient.id).order_by(Appointment.date.desc()).all()
+    appointments = Appointment.query.filter_by(patient_id=patient.id).all()
+    if not appointments:
+        return jsonify({"message": "No appointments found"}), 404
+
     return jsonify([
-        {
-            "id": a.id,
-            "doctor_id": a.doctor_id,
-            "hospital_id": a.hospital_id,
-            "date": a.date.isoformat() if getattr(a, "date", None) else None,
-            "time": a.time.strftime("%H:%M") if getattr(a, "time", None) else None,
-            "status": a.status
-        }
+        {"id": a.id, "date": str(a.date), "time": str(a.time), "status": a.status}
         for a in appointments
     ]), 200
 
-
-# ---------------- Reviews ----------------
+# -------------------------------
+# POST: Add review for doctor or hospital
+# -------------------------------
 @patient_bp.route("/reviews", methods=["POST"])
 @role_required("patient")
 def add_review():
@@ -187,15 +169,6 @@ def add_review():
 
     if "rating" not in data:
         return jsonify({"error": "Missing required field: rating"}), 400
-
-    try:
-        rating = float(data["rating"])
-    except (ValueError, TypeError):
-        return jsonify({"error": "Rating must be a number"}), 400
-
-    if not (1 <= rating <= 5):
-        return jsonify({"error": "Rating must be between 1 and 5"}), 400
-
     if not data.get("doctor_id") and not data.get("hospital_id"):
         return jsonify({"error": "Either 'doctor_id' or 'hospital_id' must be provided"}), 400
 
@@ -204,7 +177,7 @@ def add_review():
             patient_id=patient.id,
             doctor_id=data.get("doctor_id"),
             hospital_id=data.get("hospital_id"),
-            rating=rating,
+            rating=data["rating"],
             comment=data.get("comment", "")
         )
 
@@ -217,30 +190,31 @@ def add_review():
                 "id": new_review.id,
                 "rating": new_review.rating,
                 "comment": new_review.comment,
-                "created_at": new_review.created_at.isoformat() if getattr(new_review, "created_at", None) else None
+                "created_at": new_review.created_at.isoformat()
             }
         }), 201
 
     except Exception as e:
         db.session.rollback()
-        logging.error("Error adding review: %s", e)
-        return jsonify({"error": "Failed to add review"}), 500
+        return jsonify({"error": str(e)}), 500
 
-
-# ---------------- Prescriptions ----------------
+# -------------------------------
+# GET: View prescriptions linked to patient
+# -------------------------------
 @patient_bp.route("/prescriptions", methods=["GET"])
-@role_required("patient")
 def get_prescriptions():
     patient, err, code = get_current_patient()
     if err:
         return err, code
 
-    prescriptions = Prescription.query.filter_by(patient_id=patient.id).order_by(Prescription.issued_date.desc()).all()
+    prescriptions = Prescription.query.filter_by(patient_id=patient.id).all()
+    if not prescriptions:
+        return jsonify({"message": "No prescriptions found"}), 404
+
     return jsonify([
         {
             "id": p.id,
             "medication_details": p.medication_details,
-            "issued_date": p.issued_date.isoformat() if getattr(p, "issued_date", None) else None,
-            "doctor_id": getattr(p, "doctor_id", None)
+            "issued_date": str(p.issued_date)
         } for p in prescriptions
     ]), 200

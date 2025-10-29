@@ -77,6 +77,7 @@ def create_app():
     app.register_blueprint(pharmacy_bp)
     app.register_blueprint(prescription_bp)
     app.register_blueprint(review_bp, url_prefix='/reviews')
+    
 
 
     # Ensure SuperAdmin exists

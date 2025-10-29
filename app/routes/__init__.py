@@ -8,4 +8,5 @@ from .hospital import hospital_bp
 from .lab import lab_bp
 from .pharmacy_route import pharmacy_bp
 from .prescription import prescription_bp
-from .review_route import review_bp
+from .review_routes import review_bp
+
