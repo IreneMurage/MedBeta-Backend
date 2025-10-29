@@ -1,30 +1,27 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity
 from sqlalchemy.exc import IntegrityError
 from app.db import db
 from app.models import Hospital, User, Doctor, Technician, Pharmacy, PendingUser
 from app.utils.email_utils import send_invite_email
 from app.utils.tokens import generate_token
 from app.utils.time import utc_now
+from app.utils.role_required import role_required
 import csv, io, json
 
 hospital_bp = Blueprint("hospital_bp", __name__)
 
-# DELETE /hospitals/<id> — Superadmin only
-@hospital_bp.route("/hospitals/<int:id>", methods=["DELETE"])
-@jwt_required()
+# delete hospital — Superadmin only
+@hospital_bp.delete("/hospitals/<int:id>")
+@role_required("superadmin")
 def delete_hospital(id):
-    current = get_jwt_identity()
-    if current["role"] != "superadmin":
-        return jsonify({"error": "Unauthorized"}), 403
-
     hospital = Hospital.query.get(id)
     if not hospital:
         return jsonify({"error": "Hospital not found"}), 404
 
-    # Delete linked users
     for doc in hospital.doctors:
-        db.session.delete(doc.user)
+        if doc.user:
+            db.session.delete(doc.user)
     for pending in hospital.pending_users:
         db.session.delete(pending)
 
@@ -33,19 +30,14 @@ def delete_hospital(id):
     return jsonify({"message": f"Hospital {id} deleted successfully"}), 200
 
 
-# POST /hospitals/<id>/upload-staff — Hospital Admin uploads staff invites
-@hospital_bp.route("/hospitals/<int:id>/upload-staff", methods=["POST"])
-@jwt_required()
+# upload staff(CSV or JSON) — Hospital Admin only
+@hospital_bp.post("/hospitals/<int:id>/upload-staff")
+@role_required("hospital_admin","hospital")
 def upload_staff(id):
-    current = get_jwt_identity()
-    if current["role"] != "hospital_admin":
-        return jsonify({"error": "Unauthorized"}), 403
-
     hospital = Hospital.query.get(id)
     if not hospital:
         return jsonify({"error": "Hospital not found"}), 404
 
-    # Expect CSV or JSON
     file = request.files.get("file")
     staff_data = []
 
@@ -56,7 +48,7 @@ def upload_staff(id):
     elif request.is_json:
         staff_data = request.get_json().get("staff", [])
     else:
-        return jsonify({"error": "Invalid input format"}), 400
+        return jsonify({"error": "Invalid input format — must be CSV or JSON"}), 400
 
     invites_sent = []
     for staff in staff_data:
@@ -68,7 +60,7 @@ def upload_staff(id):
             continue
 
         if User.query.filter_by(email=email).first():
-            continue  
+            continue 
 
         token = generate_token(email)
         pending = PendingUser(
@@ -97,63 +89,68 @@ def upload_staff(id):
     }), 201
 
 
-# GET /hospitals/<id>/staff
-@hospital_bp.route("/hospitals/<int:id>/staff", methods=["GET"])
-@jwt_required()
+# get staff— Hospital Admin or Superadmin
+@hospital_bp.get("/hospitals/<int:id>/staff")
+@role_required("hospital_admin", "superadmin","hospital")
 def get_staff(id):
-    current = get_jwt_identity()
-    if current["role"] not in ("hospital_admin", "superadmin"):
-        return jsonify({"error": "Unauthorized"}), 403
-
     hospital = Hospital.query.get(id)
     if not hospital:
         return jsonify({"error": "Hospital not found"}), 404
 
-    doctors = [{"id": d.id, "name": d.user.name, "email": d.user.email, "role": "doctor"} for d in hospital.doctors]
-    techs = [{"id": t.id, "name": t.user.name, "email": t.user.email, "role": "labtech"} for t in Technician.query.filter_by(hospital_id=id).all()]
-    pharmas = [{"id": p.id, "name": p.user.name, "email": p.user.email, "role": "pharmacist"} for p in Pharmacy.query.filter_by(hospital_id=id).all()]
+    doctors = [
+        {"id": d.id, "name": d.user.name, "email": d.user.email, "role": "doctor"}
+        for d in hospital.doctors
+    ]
+    techs = [
+        {"id": t.id, "name": t.user.name, "email": t.user.email, "role": "labtech"}
+        for t in Technician.query.filter_by(hospital_id=id).all()
+    ]
+    pharmas = [
+        {"id": p.id, "name": p.user.name, "email": p.user.email, "role": "pharmacist"}
+        for p in Pharmacy.query.filter_by(hospital_id=id).all()
+    ]
 
     staff = doctors + techs + pharmas
     return jsonify(staff), 200
 
 
-# GET /hospitals/<id>/doctors
-@hospital_bp.route("/hospitals/<int:id>/doctors", methods=["GET"])
-@jwt_required()
+# get doctors — Any Authenticated Role
+@hospital_bp.get("/hospitals/<int:id>/doctors")
+@role_required("superadmin", "hospital_admin", "doctor", "pharmacist", "labtech","hospital")
 def get_doctors(id):
     doctors = Doctor.query.filter_by(hospital_id=id).all()
-    return jsonify([{"id": d.id, "name": d.user.name, "email": d.user.email} for d in doctors]), 200
+    return jsonify([
+        {"id": d.id, "name": d.user.name, "email": d.user.email} for d in doctors
+    ]), 200
 
 
-# GET /hospitals/<id>/labtechs
-@hospital_bp.route("/hospitals/<int:id>/labtechs", methods=["GET"])
-@jwt_required()
+# get lab techs — Any Authenticated Role
+@hospital_bp.get("/hospitals/<int:id>/labtechs")
+@role_required("superadmin", "hospital_admin", "doctor", "pharmacist", "labtech","hospital")
 def get_labtechs(id):
     techs = Technician.query.filter_by(hospital_id=id).all()
-    return jsonify([{"id": t.id, "name": t.user.name, "email": t.user.email} for t in techs]), 200
+    return jsonify([
+        {"id": t.id, "name": t.user.name, "email": t.user.email} for t in techs
+    ]), 200
 
 
-# GET /hospitals/<id>/pharmacists
-@hospital_bp.route("/hospitals/<int:id>/pharmacists", methods=["GET"])
-@jwt_required()
+# get pharmacy — Any Authenticated Role
+@hospital_bp.get("/hospitals/<int:id>/pharmacists")
+@role_required("superadmin", "hospital_admin", "doctor", "pharmacist", "labtech","hospital")
 def get_pharmacists(id):
     pharmas = Pharmacy.query.filter_by(hospital_id=id).all()
-    return jsonify([{"id": p.id, "name": p.user.name, "email": p.user.email} for p in pharmas]), 200
+    return jsonify([
+        {"id": p.id, "name": p.user.name, "email": p.user.email} for p in pharmas
+    ]), 200
 
 
-# GET /hospitals/<id> — Get hospital info (includes agreement status)
-@hospital_bp.route("/hospitals/<int:id>", methods=["GET"])
-@jwt_required()
+# Getting hospital information after signing the agreement
+@hospital_bp.get("/hospitals/<int:id>")
+@role_required("superadmin", "hospital_admin", "doctor", "labtech", "pharmacist","hospital")
 def get_hospital(id):
-    current = get_jwt_identity()
     hospital = Hospital.query.get(id)
-
     if not hospital:
         return jsonify({"error": "Hospital not found"}), 404
-
-    # Allow hospital admin, superadmin, or linked hospital users
-    if current["role"] not in ("superadmin", "hospital_admin") and current.get("hospital_id") != id:
-        return jsonify({"error": "Unauthorized"}), 403
 
     return jsonify({
         "id": hospital.id,
@@ -165,19 +162,13 @@ def get_hospital(id):
     }), 200
 
 
-# PUT /hospitals/<id>/agreement — Sign data-sharing agreement
-@hospital_bp.route("/hospitals/<int:id>/agreement", methods=["PUT"])
-@jwt_required()
+# Sign agreement — Hospital Admin or Superadmin
+@hospital_bp.put("/hospitals/<int:id>/agreement")
+@role_required("hospital_admin", "superadmin", "hospital")
 def update_agreement(id):
-    current = get_jwt_identity()
     hospital = Hospital.query.get(id)
-
     if not hospital:
         return jsonify({"error": "Hospital not found"}), 404
-
-    # Only hospital admins or superadmins can sign
-    if current["role"] not in ("hospital_admin", "superadmin"):
-        return jsonify({"error": "Unauthorized"}), 403
 
     hospital.agreement_signed = True
     db.session.commit()

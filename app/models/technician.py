@@ -31,6 +31,8 @@ class TestRequest(db.Model):
     status = db.Column(db.String(20), default="Pending") 
     date_requested = db.Column(db.DateTime, default=utc_now)
     date_completed = db.Column(db.DateTime, nullable=True)
+    results = db.Column(db.Text, nullable=True)
+
 
     # Foreign keys
     doctor_id = db.Column(db.Integer, db.ForeignKey("doctors.id"), nullable=False)
