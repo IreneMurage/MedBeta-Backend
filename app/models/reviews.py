@@ -7,6 +7,15 @@ def utc_now():
 
 
 class Review(db.Model):
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'rating': self.rating,
+            'comment': self.comment,
+            'doctor_id': self.doctor_id,
+            'hospital_id': self.hospital_id,
+            'patient_id': self.patient_id
+        }
     __tablename__ = "reviews"
 
     id = db.Column(db.Integer, primary_key=True)

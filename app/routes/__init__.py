@@ -2,9 +2,11 @@ from .auth_routes import auth_bp
 from .appoint_routes import appointment_bp
 from .medical_routes import medical_bp
 from .admin_routes import superadmin_bp
-from .patient import patient_bp
+from .patient_routes import patient_bp
 from .doctor_route import doctor_bp
 from .hospital import hospital_bp
 from .lab import lab_bp
 from .pharmacy_route import pharmacy_bp
 from .prescription import prescription_bp
+from .review_routes import review_bp
+
