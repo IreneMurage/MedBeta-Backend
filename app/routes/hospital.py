@@ -8,6 +8,8 @@ from app.utils.tokens import generate_token
 from app.utils.time import utc_now
 from app.utils.role_required import role_required
 import csv, io, json
+from uuid import uuid4
+
 
 hospital_bp = Blueprint("hospital_bp", __name__)
 
@@ -32,7 +34,7 @@ def delete_hospital(id):
 
 # upload staff(CSV or JSON) — Hospital Admin only
 @hospital_bp.post("/hospitals/<int:id>/upload-staff")
-@role_required("hospital_admin","hospital")
+@role_required("hospital_admin", "hospital")
 def upload_staff(id):
     hospital = Hospital.query.get(id)
     if not hospital:
@@ -41,6 +43,7 @@ def upload_staff(id):
     file = request.files.get("file")
     staff_data = []
 
+    # Support both CSV and JSON
     if file and file.filename.endswith(".csv"):
         stream = io.StringIO(file.stream.read().decode("utf-8"))
         reader = csv.DictReader(stream)
@@ -51,41 +54,63 @@ def upload_staff(id):
         return jsonify({"error": "Invalid input format — must be CSV or JSON"}), 400
 
     invites_sent = []
+    skipped = []
+
     for staff in staff_data:
         name = staff.get("name")
         email = staff.get("email")
         role = staff.get("role")
 
+        # Validate input
         if not all([name, email, role]):
+            skipped.append({"email": email, "reason": "Missing fields"})
             continue
 
-        if User.query.filter_by(email=email).first():
-            continue 
+        # Ensure role is valid for hospital invite
+        if role.lower() not in ["doctor", "pharmacist", "technician"]:
+            skipped.append({"email": email, "reason": f"Invalid role: {role}"})
+            continue
 
-        token = generate_token(email)
+        # Prevent duplicates
+        if User.query.filter_by(email=email).first() or PendingUser.query.filter_by(email=email).first():
+            skipped.append({"email": email, "reason": "Already exists or invited"})
+            continue
+
+        # Generate token and expiry
+        token = str(uuid4())
+        expires_at = datetime.utcnow() + timedelta(days=7)
+
+        # Store pending user
         pending = PendingUser(
             email=email,
             name=name,
-            role=role,
+            role=role.lower(),
             hospital_id=id,
             invite_token=token,
-            expires_at=utc_now(),
+            expires_at=expires_at,
+            is_accepted=False
         )
         db.session.add(pending)
 
-        verify_link = f"{request.host_url}auth/setup-password/{token}"
-        send_invite_email(email, name, role, verify_link)
-        invites_sent.append(email)
+        try:
+            # Send invite email
+            send_invite_email(email, token)
+            invites_sent.append(email)
+        except Exception as e:
+            print(f"Email send failed for {email}: {e}")
+            skipped.append({"email": email, "reason": "Email send failed"})
 
+    # Commit all valid invites
     try:
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
-        return jsonify({"error": "Some emails already pending"}), 400
+        return jsonify({"error": "Some invites could not be processed"}), 400
 
     return jsonify({
-        "message": f"Invites sent to {len(invites_sent)} staff",
-        "emails": invites_sent
+        "message": f"Processed {len(staff_data)} staff records",
+        "invites_sent": invites_sent,
+        "skipped": skipped
     }), 201
 
 
