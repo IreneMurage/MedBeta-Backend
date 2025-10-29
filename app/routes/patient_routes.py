@@ -1,33 +1,45 @@
 """Secure Patient routes for MedBeta backend API."""
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity
+from datetime import datetime
+import logging
+
 from app.models.patient import Patient
 from app.models.Appointment import Appointment
 from app.models.reviews import Review
 from app.models.medicalrecord import MedicalRecord
+from app.models.prescriptions import Prescription 
 from app.db import db
 from app.utils.role_required import role_required
-from datetime import datetime
-import logging
 
-patient_bp = Blueprint("patient", __name__, url_prefix="/patients")
+patient_bp = Blueprint("patient_bp", __name__, url_prefix="/patients")
 
-# -----------------------------------
-# Helper: get logged-in patient safely
-# -----------------------------------
+
+# -------------------------------------------------
+# Helper: Get logged-in patient safely from JWT
+# -------------------------------------------------
 def get_current_patient():
-    user_id = int(get_jwt_identity())
+    identity = get_jwt_identity()
+
+    # handle both raw id or dict identity
+    if isinstance(identity, dict):
+        user_id = identity.get("id")
+    else:
+        user_id = int(identity)
+
     patient = Patient.query.filter_by(user_id=user_id).first()
     if not patient:
         return None, jsonify({"error": "Patient not found"}), 404
     return patient, None, None
 
-# -------------------------------
+
+# -------------------------------------------------
 # GET: View patient profile
-# -------------------------------
+# -------------------------------------------------
 @patient_bp.route("/profile", methods=["GET"])
 @role_required("patient")
 def get_patient_profile():
+    """Retrieve logged-in patient's profile."""
     patient, err, code = get_current_patient()
     if err:
         return err, code
@@ -35,15 +47,18 @@ def get_patient_profile():
     return jsonify({
         "id": patient.id,
         "phone": patient.phone,
-        "address": patient.address
+        "address": patient.address,
+        "dob": str(patient.dob) if patient.dob else None
     }), 200
 
-# -------------------------------
+
+# -------------------------------------------------
 # PUT: Update patient profile
-# -------------------------------
+# -------------------------------------------------
 @patient_bp.route("/profile", methods=["PUT"])
 @role_required("patient")
 def update_patient_profile():
+    """Allow a patient to update their profile details."""
     patient, err, code = get_current_patient()
     if err:
         return err, code
@@ -63,12 +78,14 @@ def update_patient_profile():
         logging.error(f"Error updating patient profile: {e}")
         return jsonify({"error": "Failed to update profile"}), 500
 
-# -------------------------------
-# GET: View all medical records
-# -------------------------------
+
+# -------------------------------------------------
+# GET: All medical records
+# -------------------------------------------------
 @patient_bp.route("/medical-records", methods=["GET"])
 @role_required("patient")
 def get_medical_records():
+    """Retrieve all medical records for logged-in patient."""
     patient, err, code = get_current_patient()
     if err:
         return err, code
@@ -82,12 +99,14 @@ def get_medical_records():
         for r in records
     ]), 200
 
-# -------------------------------
-# POST: Book new appointment
-# -------------------------------
+
+# -------------------------------------------------
+# POST: Book a new appointment
+# -------------------------------------------------
 @patient_bp.route("/appointments", methods=["POST"])
 @role_required("patient")
 def book_appointment():
+    """Book a new appointment with a doctor."""
     patient, err, code = get_current_patient()
     if err:
         return err, code
@@ -133,14 +152,17 @@ def book_appointment():
         }), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Error booking appointment: {e}")
+        return jsonify({"error": "Failed to book appointment"}), 500
 
-# -------------------------------
-# GET: All appointments for patient
-# -------------------------------
+
+# -------------------------------------------------
+# GET: All appointments for logged-in patient
+# -------------------------------------------------
 @patient_bp.route("/appointments", methods=["GET"])
 @role_required("patient")
 def get_appointments():
+    """Retrieve all appointments for the logged-in patient."""
     patient, err, code = get_current_patient()
     if err:
         return err, code
@@ -154,12 +176,14 @@ def get_appointments():
         for a in appointments
     ]), 200
 
-# -------------------------------
+
+# -------------------------------------------------
 # POST: Add review for doctor or hospital
-# -------------------------------
+# -------------------------------------------------
 @patient_bp.route("/reviews", methods=["POST"])
 @role_required("patient")
 def add_review():
+    """Submit a review for a doctor or hospital."""
     patient, err, code = get_current_patient()
     if err:
         return err, code
@@ -195,13 +219,17 @@ def add_review():
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Error adding review: {e}")
+        return jsonify({"error": "Failed to add review"}), 500
 
-# -------------------------------
+
+# -------------------------------------------------
 # GET: View prescriptions linked to patient
-# -------------------------------
+# -------------------------------------------------
 @patient_bp.route("/prescriptions", methods=["GET"])
+@role_required("patient")  # ✅ Added missing decorator
 def get_prescriptions():
+    """Retrieve all prescriptions for the logged-in patient."""
     patient, err, code = get_current_patient()
     if err:
         return err, code
