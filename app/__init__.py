@@ -81,7 +81,10 @@ def create_app():
     with app.app_context():
         db.create_all()
         create_superadmin_if_needed()
-    
 
+    #  Close sessions after each request
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        db.session.remove()
     return app
   
