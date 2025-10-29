@@ -11,6 +11,10 @@ from flask_cors import CORS
 
 
 
+
+from app.routes.patient_routes import patient_bp
+
+
 bcrypt = Bcrypt()
 jwt = JWTManager()
 
@@ -70,6 +74,7 @@ def create_app():
     app.register_blueprint(appointment_bp, url_prefix='/appointments')
     app.register_blueprint(medical_bp, url_prefix='/medical-records')
     app.register_blueprint(superadmin_bp, url_prefix='/admin')
+
     app.register_blueprint(patient_bp)
     app.register_blueprint(doctor_bp)
     app.register_blueprint(hospital_bp)
@@ -79,11 +84,25 @@ def create_app():
     app.register_blueprint(review_bp, url_prefix='/reviews')
     
 
+    app.register_blueprint(patient_bp, url_prefix='/patients')
+    
+
+
+
 
     # Ensure SuperAdmin exists
     with app.app_context():
         db.create_all()
         create_superadmin_if_needed()
+
+
+    #  Register Blueprints
+    # app.register_blueprint(patient_bp)
+
+    @app.route("/")
+    def home():
+        return {"message": "MedBeta API is running"}
+
     
 
     return app
