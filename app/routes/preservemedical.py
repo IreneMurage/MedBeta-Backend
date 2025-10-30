@@ -4,7 +4,6 @@ from app.db import db
 from app.models import MedicalRecord, Appointment, Patient, Doctor
 from app.utils.role_required import role_required
 from app.utils.log_access import log_access
-from app.utils.encryption import encrypt_text, decrypt_text  # <-- import helpers
 
 medical_bp = Blueprint("medical_bp", __name__, url_prefix="/medical-records")
 
@@ -15,16 +14,17 @@ def serialize_record(r):
 
     return {
         "id": r.id,
-        "diagnosis": decrypt_text(r.diagnosis),
-        "treatment": decrypt_text(r.treatment),
-        "notes": decrypt_text(r.notes),
+        "diagnosis": r.diagnosis,
+        "treatment": r.treatment,
+        "notes": r.notes,
         "doctor": {
             "id": doctor.id,
-            "name": doctor.user.name,
+            "name": doctor.name,
             "specialization": doctor.specialization
         } if doctor else None,
         "patient": {
             "id": patient.id,
+            "full_name": patient.full_name
         } if patient else None,
         "appointment": {
             "id": appointment.id,
@@ -38,14 +38,13 @@ def serialize_record(r):
 @medical_bp.route("/patient/<int:patient_id>", methods=["GET"])
 @jwt_required()
 def get_records_for_patient(patient_id):
-    user_id = int(get_jwt_identity())
+    user_id = int(get_jwt_identity())  # now string → convert to int
     claims = get_jwt()
     role = claims.get("role")
 
     if role == "patient" and user_id != patient_id:
         return jsonify({"error": "Unauthorized"}), 403
 
-    doctor = None
     if role == "doctor":
         doctor = Doctor.query.filter_by(user_id=user_id).first()
         if not doctor:
@@ -59,10 +58,14 @@ def get_records_for_patient(patient_id):
         if not appointment:
             return jsonify({"error": "Doctor has no access to this patient's records"}), 403
 
-    log_access(doctor_id=doctor.id if doctor else None, patient_id=patient_id)
+    log_access(doctor_id=doctor.id, patient_id=patient_id)
+
 
     records = MedicalRecord.query.filter_by(patient_id=patient_id).all()
+
     return jsonify([serialize_record(r) for r in records]), 200
+
+
 
 # POST — Doctor only
 @medical_bp.route("/", methods=["POST"])
@@ -70,34 +73,44 @@ def get_records_for_patient(patient_id):
 def create_record():
     user_id = int(get_jwt_identity())
     data = request.get_json()
-
-    try:
-        patient_id = int(data.get("patient_id"))
-    except (ValueError, TypeError):
-        return jsonify({"error": "Invalid patient_id format"}), 400
+    patient_id = data.get("patient_id")
+    appointment_id = data.get("appointment_id")
 
     if not patient_id:
         return jsonify({"error": "Missing patient_id"}), 400
-    
-    doctor = Doctor.query.filter_by(user_id=user_id).first()
-    if not doctor:
-        return jsonify({"error": "Doctor profile not found"}), 404
+
+    if appointment_id:
+        appointment = Appointment.query.filter_by(
+            id=appointment_id,
+            doctor_id=user_id,
+            patient_id=patient_id
+        ).first()
+        if not appointment:
+            return jsonify({"error": "Invalid appointment"}), 403
+    else:
+        appointment = Appointment.query.filter_by(
+            doctor_id=user_id, patient_id=patient_id
+        ).first()
+        if not appointment:
+            return jsonify({"error": "Doctor has no appointments with this patient"}), 403
 
     new_record = MedicalRecord(
         patient_id=patient_id,
-        doctor_id=doctor.id,
-        diagnosis=encrypt_text(data.get("diagnosis")),
-        treatment=encrypt_text(data.get("treatment")),
-        notes=encrypt_text(data.get("notes"))
+        doctor_id=user_id,
+        appointment_id=appointment_id,
+        diagnosis=data.get("diagnosis"),
+        treatment=data.get("treatment"),
+        notes=data.get("notes")
     )
-
     db.session.add(new_record)
     db.session.commit()
 
     return jsonify({
-        "message": "Medical record created",
-        "record": serialize_record(new_record)
-    }), 201
+    "message": "Medical record created",
+    "record": serialize_record(new_record)
+}), 201
+
+
 
 # PUT — Only owning doctor or admin
 @medical_bp.route("/<int:id>", methods=["PUT"])
@@ -110,24 +123,22 @@ def update_record(id):
 
     record = MedicalRecord.query.get_or_404(id)
 
-    if role == "doctor" and record.doctor.user_id != user_id:
+    if role == "doctor" and record.doctor_id != user_id:
         return jsonify({"error": "Unauthorized"}), 403
 
-    if role in ["admin", "superadmin"] or record.doctor.user_id == user_id:
-        if data.get("diagnosis"):
-            record.diagnosis = encrypt_text(data["diagnosis"])
-        if data.get("treatment"):
-            record.treatment = encrypt_text(data["treatment"])
-        if data.get("notes"):
-            record.notes = encrypt_text(data["notes"])
-
+    if role in ["admin", "superadmin"] or record.doctor_id == user_id:
+        record.diagnosis = data.get("diagnosis", record.diagnosis)
+        record.treatment = data.get("treatment", record.treatment)
+        record.notes = data.get("notes", record.notes)
         db.session.commit()
         return jsonify({
-            "message": "Record updated",
-            "record": serialize_record(record)
-        }), 200
+    "message": "Record updated",
+    "record": serialize_record(record)
+}), 200
+
 
     return jsonify({"error": "Forbidden"}), 403
+
 
 # DELETE — Admin
 @medical_bp.route("/<int:id>", methods=["DELETE"])

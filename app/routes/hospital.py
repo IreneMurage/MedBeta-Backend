@@ -13,6 +13,7 @@ from uuid import uuid4
 
 hospital_bp = Blueprint("hospital_bp", __name__)
 
+
 # delete hospital — Superadmin only
 @hospital_bp.delete("/hospitals/<int:id>")
 @role_required("superadmin")

@@ -13,6 +13,7 @@ class Config:
 
     SECRET_KEY = os.getenv("SECRET_KEY")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+    ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
 
     SQLALCHEMY_ENGINE_OPTIONS = {
         "connect_args": {"options": "-4"},  # Force IPv4 connections

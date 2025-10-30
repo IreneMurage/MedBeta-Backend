@@ -71,7 +71,7 @@ def get_doctor_appointments():
                 "patient_name": a.patient.user.name,
                 "date": a.date.isoformat() if a.date else None,
                 "status": a.status,
-                "notes": a.notes,
+                # "notes": a.notes,
             }
             for a in appointments
         ]
