@@ -15,6 +15,9 @@ class Hospital(db.Model):
     doctors = db.relationship("Doctor", back_populates="hospital")
     appointments = db.relationship("Appointment", back_populates="hospital")
     reviews = db.relationship("Review", back_populates="hospital")
+    technicians = db.relationship("Technician", back_populates="hospital") 
+    pharmacies = db.relationship("Pharmacy", back_populates="hospital")
+
 
 def __repr__(self):
     return f"<Hospital {self.name}>"

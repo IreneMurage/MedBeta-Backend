@@ -9,6 +9,8 @@ class Technician(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    hospital_id = db.Column(db.Integer, db.ForeignKey("hospitals.id"), nullable=True)  
+
     profile_pic = db.Column(db.String(255))
     notes = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True)
@@ -17,6 +19,7 @@ class Technician(db.Model):
     # Relationships
     user = db.relationship("User", back_populates="technician")
     test_requests = db.relationship("TestRequest", back_populates="technician")
+    hospital = db.relationship("Hospital", back_populates="technicians")
 
     def __repr__(self):
         return f"<Technician {self.user.name}>"
