@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy.exc import IntegrityError
 from app.db import db
 from app.models import Hospital, User, Doctor, Technician, Pharmacy, PendingUser
@@ -9,9 +9,71 @@ from app.utils.time import utc_now
 from app.utils.role_required import role_required
 import csv, io, json
 from uuid import uuid4
+from datetime import datetime, timedelta
 
 
 hospital_bp = Blueprint("hospital_bp", __name__)
+
+
+@hospital_bp.route("/hospitals/invite-staff", methods=["POST"])
+@role_required("hospital", "hospital_admin")
+def invite_staff():
+    """Allow hospital admins to invite their own staff."""
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        name = data.get("name")
+        role = data.get("role")
+
+        if not all([email, name, role]):
+            return jsonify({"error": "Missing required fields (email, name, role)"}), 400
+
+        # Fetch hospital using logged-in user
+        user_id = int(get_jwt_identity())
+        hospital = Hospital.query.filter_by(user_id=user_id).first()
+
+        if not hospital:
+            return jsonify({"error": "Hospital not found"}), 404
+
+        # Prevent duplicate invites or existing accounts
+        if User.query.filter_by(email=email).first():
+            return jsonify({"error": "A user with this email already exists"}), 400
+        if PendingUser.query.filter_by(email=email).first():
+            return jsonify({"error": "An invite has already been sent to this email"}), 400
+
+        # Create pending invite
+        invite_token = str(uuid4())
+        expires_at = datetime.utcnow() + timedelta(days=7)
+
+        new_invite = PendingUser(
+            email=email,
+            name=name,
+            role=role,
+            hospital_id=hospital.id,
+            invite_token=invite_token,
+            expires_at=expires_at,
+            is_accepted=False
+        )
+        db.session.add(new_invite)
+        db.session.commit()
+
+        # Optional: send an invite email with link
+        try:
+            send_invite_email(email, invite_token)
+
+        except Exception as e:
+            print(f"Email sending failed: {e}")
+
+        return jsonify({
+            "message": f"Invite sent successfully to {email}",
+            "invite_token": invite_token,
+            "hospital_id": hospital.id
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error in invite_staff: {e}")
+        return jsonify({"error": "Failed to send invite", "details": str(e)}), 500
 
 
 # delete hospital — Superadmin only

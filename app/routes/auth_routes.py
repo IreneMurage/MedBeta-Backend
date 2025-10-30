@@ -69,7 +69,19 @@ def login():
         expires_delta=timedelta(days=1)
     )
 
-    return jsonify({"token": token, "role": user.role}), 200
+    # attach hospital_id if user is a hospital admin
+    hospital_id = None
+    if user.role in ("hospital", "hospital_admin"):
+        hospital = Hospital.query.filter_by(user_id=user.id).first()
+        if hospital:
+            hospital_id = hospital.id
+
+    return jsonify({
+        "token": token,
+        "role": user.role,
+        "hospital_id": hospital_id,  # 👈 add this
+        "user_id": user.id
+    }), 200
 
 
 #  POST /auth/logout
