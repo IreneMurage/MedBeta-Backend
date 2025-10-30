@@ -2,7 +2,7 @@ import os
 from app.utils.email_utils import send_email
 from dotenv import load_dotenv
 
-# Load your .env so it knows your Brevo key
+# Load  .env 
 load_dotenv()
 # print("CWD:", os.getcwd())
 # print("BREVO_API_KEY:", os.getenv("BREVO_API_KEY"))
