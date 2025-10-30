@@ -14,7 +14,7 @@ class PendingUser(db.Model):
     invite_token = db.Column(db.String(255), unique=True, nullable=False)
     is_accepted = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=utc_now)
-    expires_at = db.Column(db.DateTime)  # set maybe 48 hours or 7 days later
+    expires_at = db.Column(db.DateTime)  
 
     hospital = db.relationship("Hospital", backref="pending_users")
 
