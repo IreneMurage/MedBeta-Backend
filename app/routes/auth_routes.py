@@ -169,6 +169,7 @@ def setup_password(token):
     if User.query.filter_by(email=pending.email).first():
         return jsonify({"error": "User already activated"}), 400
 
+    # Create the user
     user = User(
         name=pending.name,
         email=pending.email,

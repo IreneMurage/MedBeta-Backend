@@ -1,2 +1,4 @@
 .env
 pass_txt
+__pycache__/
+*.pyc

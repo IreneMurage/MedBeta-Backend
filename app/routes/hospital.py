@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 hospital_bp = Blueprint("hospital_bp", __name__)
 
 
+
 @hospital_bp.route("/hospitals/invite-staff", methods=["POST"])
 @role_required("hospital", "hospital_admin")
 def invite_staff():
